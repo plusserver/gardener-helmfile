@@ -1,0 +1,64 @@
+helmDefaults:
+  kubeContext: seed
+  wait: true
+
+releases:
+  - name: gardenlet
+    namespace: garden
+    chart: /tmp/gardener/charts/gardener/gardenlet
+    values:
+      - global:
+          gardenlet:
+            config:
+              gardenClientConnection:
+                kubeconfigSecret:
+                  name: gardenlet-kubeconfig
+                  namespace: garden
+                bootstrapKubeconfig:
+                  name: gardenlet-kubeconfig-bootstrap
+                  namespace: garden
+                  kubeconfig: |
+                    apiVersion: v1
+                    kind: Config
+                    current-context: gardenlet-bootstrap@default
+                    clusters:
+                    - cluster:
+                        certificate-authority-data: {{ requiredEnv "GARDEN_API_SERVER_CERT" }}
+                        server: {{ requiredEnv "GARDEN_API_SERVER_URL" }}
+                      name: default
+                    contexts:
+                    - context:
+                        cluster: default
+                        user: gardenlet-bootstrap
+                      name: gardenlet-bootstrap@default
+                    users:
+                    - name: gardenlet-bootstrap
+                      user:
+                        token: CHANGEME
+              seedConfig:
+                metadata:
+                  name: seed
+                spec:
+                  provider:
+                    type: openstack
+                    region: RegionOne
+                  dns:
+                    provider:
+                      type: aws-route53
+                      secretRef:
+                        name: route53-secret
+                        namespace: garden
+                      domains:
+                        include:
+                        - seed-01.garden-test.{{ requiredEnv "BASE_DOMAIN" }}
+                  ingress:
+                    domain: seed-01.garden-test.{{ requiredEnv "BASE_DOMAIN" }}
+                    controller:
+                      kind: nginx
+                  networks:
+                    nodes: 10.240.0.0/16
+                    pods: 10.42.0.0/16
+                    services: 10.10.0.0/24
+                    shootDefaults:
+                      pods: 10.64.0.0/12
+                      services: 10.80.0.0/12

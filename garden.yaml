@@ -1,0 +1,72 @@
+helmDefaults:
+  kubeContext: garden
+  wait: true
+
+repositories:
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami
+
+releases:
+  - name: etcd
+    namespace: etcd
+    chart: bitnami/etcd
+    version: 6.1.5
+    values:
+      - auth:
+          rbac:
+            enabled: false
+        replicaCount: 3
+
+  - name: controlplane
+    namespace: garden
+    chart: /tmp/gardener/charts/gardener/controlplane
+    values:
+      - global:
+          admission:
+            image:
+              tag: v1.20.0
+            config:
+              server:
+                https:
+                  tls:
+                    caBundle: |
+                      {{ requiredEnv "PKI_CA_CRT" | nindent 22 }}
+                    crt: |
+                      {{ requiredEnv "PKI_ADMISSION_CRT" | nindent 22 }}
+                    key: |
+                      {{ requiredEnv "PKI_ADMISSION_KEY" | nindent 22 }}
+
+          internalDomain:
+            provider: aws-route53
+            domain: garden-test.{{ requiredEnv "BASE_DOMAIN" }}
+            credentials:
+              AWS_ACCESS_KEY_ID: {{ requiredEnv "AWS_ACCESS_KEY_ID" | b64enc }}
+              AWS_SECRET_ACCESS_KEY: {{ requiredEnv "AWS_SECRET_ACCESS_KEY" | b64enc }}
+
+          controller:
+            image:
+              tag: v1.20.0
+
+          scheduler:
+            image:
+              tag: v1.20.0
+
+          apiserver:
+            image:
+              tag: v1.20.0
+            clusterIdentity: garden-cluster-identity
+            etcd:
+              servers: http://etcd-headless.etcd:2379
+            insecureSkipTLSVerify: true
+            tls:
+              crt: |
+                {{ requiredEnv "PKI_API_CRT" | nindent 16 }}
+              key: |
+                {{ requiredEnv "PKI_API_KEY" | nindent 16 }}
+            admission:
+              validatingWebhook:
+                token:
+                  enabled: true
+              mutatingWebhook:
+                token:
+                  enabled: true

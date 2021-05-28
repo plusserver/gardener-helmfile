@@ -1,0 +1,5 @@
+missingFileHandler: Error
+
+helmfiles:
+  - garden.yaml
+  - seed.yaml
